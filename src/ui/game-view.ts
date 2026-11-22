@@ -14,6 +14,7 @@ import {
   paint,
   paintTarget,
 } from '../game/rules';
+import { dailyLevel, prettyDate, pruneDaily, startDaily, streak } from '../game/daily';
 import { getLevel, Level, LEVEL_COUNT, startLevel, starsFor } from '../game/levels';
 import type { GameState, MoveEvents, Pos, Tile } from '../game/types';
 import { ICONS, tileSvg } from './art';
@@ -22,7 +23,7 @@ import { sfx } from './sound';
 import type { Player } from '../data/types';
 import type { DeviceSettings } from './store';
 
-export type Mode = { kind: 'calm' } | { kind: 'challenge'; level: number };
+export type Mode = { kind: 'calm' } | { kind: 'challenge'; level: number } | { kind: 'daily'; date: string };
 
 export interface GameCallbacks {
   player: Player;
@@ -80,16 +81,22 @@ export class GameView {
     this.resizeObs.disconnect();
   }
 
+  private title(): string {
+    if (this.mode.kind === 'calm') return 'Calm play';
+    if (this.mode.kind === 'daily') return `Daily · ${prettyDate(this.mode.date)}`;
+    return `Level ${this.mode.level}`;
+  }
+
   private q<T extends HTMLElement = HTMLElement>(sel: string): T {
     return this.el.querySelector(sel) as T;
   }
 
   private template(): string {
-    const challenge = this.mode.kind === 'challenge';
+    const challenge = this.mode.kind !== 'calm';
     return `
       <header class="topbar">
         <button class="icon-btn back" aria-label="Back to menu">${ICONS.back}</button>
-        <div class="title-chip">${challenge ? `Level ${(this.mode as { level: number }).level}` : 'Calm play'}</div>
+        <div class="title-chip">${this.title()}</div>
         <div class="score-box"><span class="label">Score</span><span class="score">0</span></div>
       </header>
       <div class="goal">
@@ -127,6 +134,11 @@ export class GameView {
     if (this.mode.kind === 'calm') {
       this.state = newGame(CALM, makeRng(Date.now() & 0xffffffff));
       this.level = null;
+    } else if (this.mode.kind === 'daily') {
+      this.level = dailyLevel(this.mode.date);
+      this.state = startDaily(this.mode.date);
+      this.undosLeft = CHALLENGE_UNDOS;
+      this.hintsLeft = CHALLENGE_HINTS;
     } else {
       this.level = getLevel(this.mode.level);
       this.state = startLevel(this.level);
@@ -495,7 +507,32 @@ export class GameView {
     const ov = this.q('.overlay');
     let html: string;
 
-    if (this.level) {
+    if (this.mode.kind === 'daily') {
+      const date = this.mode.date;
+      const stars = starsFor(this.level!, this.state.score);
+      const before = d.daily?.[date];
+      const best = before === undefined || this.state.score > before;
+      d.daily = pruneDaily({ ...(d.daily ?? {}), [date]: Math.max(before ?? 0, this.state.score) });
+      this.cb.persist();
+      const days = streak(d.daily, date);
+      html = `
+        <div class="card results">
+          <h2>${stars === 3 ? 'Perfect day!' : stars > 0 ? 'Nice one!' : 'Good try!'}</h2>
+          <div class="big-stars">${[0, 1, 2].map((i) => `<span class="${i < stars ? 'on' : ''}" style="animation-delay:${300 + i * 350}ms">${ICONS.star}</span>`).join('')}</div>
+          ${bonus ? `<p class="bonus">🎉 Board cleared! +${bonus}</p>` : ''}
+          <p class="final">Score <b>${this.state.score}</b></p>
+          <p class="${best ? 'bonus' : 'sub'}">${best ? "🏅 Your best today!" : `Your best today: ${d.daily[date]}`}</p>
+          <p class="sub">🔥 ${days} ${days === 1 ? 'day' : 'days'} in a row</p>
+          <div class="actions">
+            <button class="btn primary board">See today’s scores</button>
+            <button class="btn retry">Try for a higher score</button>
+          </div>
+        </div>`;
+      if (stars > 0 || bonus) {
+        sfx.win();
+        confetti(this.el, stars * 40 + (cleared ? 60 : 0));
+      } else sfx.done();
+    } else if (this.level) {
       const n = this.level.number;
       const stars = starsFor(this.level, this.state.score);
       const prevStars = d.levelStars[n] ?? 0;
@@ -552,5 +589,6 @@ export class GameView {
     on('.again', () => this.start());
     on('.map', () => this.cb.onExit());
     on('.menu', () => this.cb.onExit());
+    on('.board', () => this.cb.onExit());
   }
 }

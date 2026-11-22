@@ -17,6 +17,8 @@ for a **+1000** bonus.
 - **Two modes:**
   - 🌿 **Calm:** no rush, unlimited undo and hints, no losing
   - 🏆 **Challenge:** 24 levels on a map, with 1–3 stars to earn on each
+  - 📅 **Daily puzzle:** the same board for everyone each day; your best score counts, with a
+    streak counter and today's family scores
 
 - **Player profiles:** each family member picks a name and a fruit-friend avatar and keeps
   their own stars and best scores. A **family leaderboard** compares everyone.

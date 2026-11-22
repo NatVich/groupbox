@@ -28,6 +28,11 @@ You already have a Firebase project. These steps finish the setup. They take abo
 2. Replace everything with the contents of [`firestore.rules`](../firestore.rules).
 3. Click **Publish**.
 
+## Updating the rules
+When `firestore.rules` changes (for example the daily puzzle added a `daily` field), paste the
+new version into **Firestore Database → Rules** and click **Publish** again. Until you do, the game
+shows a warning that progress isn't saving.
+
 ## What the rules allow
 - A device has to know a family's exact code to open it. Families can't be listed or searched.
 - Inside a family, players can be added, updated and deleted, and their data is checked:

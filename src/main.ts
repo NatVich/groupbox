@@ -2,6 +2,7 @@ import './ui/style.css';
 import { openStore } from './data';
 import {
   cleanName,
+  dailyBoard,
   Family,
   leaderboard,
   levelsBeaten,
@@ -14,6 +15,7 @@ import {
   totalStars,
 } from './data/types';
 import { FRUITS } from './game/types';
+import { dateKey, prettyDate, streak } from './game/daily';
 import { getLevel, LEVEL_COUNT } from './game/levels';
 import { groupPoints } from './game/rules';
 import { fruitSvg, ICONS, tileSvg } from './ui/art';
@@ -49,6 +51,14 @@ function esc(s: string): string {
 
 const avatar = (p: Player, cls = '') => `<span class="avatar ${cls}">${fruitSvg(p.avatar)}</span>`;
 
+/** Shows a short warning at the bottom of the screen. */
+function warn(text: string) {
+  document.querySelector('.save-warning')?.remove();
+  const el = h(`<div class="save-warning" role="alert">${esc(text)}</div>`);
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 9000);
+}
+
 function message(title: string, body: string, retry?: () => void) {
   const el = h(`
     <div class="screen centered">
@@ -67,6 +77,7 @@ function message(title: string, body: string, retry?: () => void) {
 async function boot() {
   show(h(`<div class="screen centered"><div class="loading">${fruitSvg(0)}<p>Loading…</p></div></div>`));
   store = await openStore();
+  store.onSaveError = (e) => warn(`Progress is not saving to the family yet. ${e.message}`);
   try {
     if (settings.familyCode) family = await store.getFamily(settings.familyCode);
     if (!family && store.kind === 'local') {
@@ -456,6 +467,7 @@ function menu() {
       </div>
       <div class="menu-buttons">
         <button class="btn big calm"><b>🌿 Calm play</b><small>No rush · unlimited undo &amp; hints</small></button>
+        <button class="btn big daily"><b>📅 Daily puzzle</b><small>${dailySubtitle(p)}</small></button>
         <button class="btn big challenge"><b>🏆 Challenge</b><small>${totalStars(p)} of ${LEVEL_COUNT * 3} stars collected</small></button>
         <div class="menu-row">
           <button class="btn how">❓ How to play</button>
@@ -469,6 +481,7 @@ function menu() {
     </div>`);
   el.querySelector<HTMLElement>('.player-chip')!.onclick = () => whoIsPlaying();
   el.querySelector<HTMLElement>('.calm')!.onclick = () => play({ kind: 'calm' });
+  el.querySelector<HTMLElement>('.daily')!.onclick = () => dailyScreen();
   el.querySelector<HTMLElement>('.challenge')!.onclick = () => levelMap();
   el.querySelector<HTMLElement>('.how')!.onclick = () => howTo(el);
   el.querySelector<HTMLElement>('.board-btn')?.addEventListener('click', () => leaderboardScreen());
@@ -497,6 +510,64 @@ function menu() {
     /* storage blocked: just show the guide */
   }
   if (!seen) howTo(el);
+}
+
+function dailySubtitle(p: Player): string {
+  const today = dateKey();
+  const score = p.daily?.[today];
+  const days = streak(p.daily, today);
+  if (score !== undefined) return `Today: ${score} points · 🔥 ${days} ${days === 1 ? 'day' : 'days'}`;
+  return days > 0 ? `New board today · 🔥 ${days} days, keep it going!` : 'A new board every day';
+}
+
+// ---------- daily puzzle ----------
+
+async function dailyScreen() {
+  if (!player) return whoIsPlaying();
+  try {
+    await loadPlayers();
+    player = players.find((p) => p.id === player!.id) ?? player;
+  } catch {
+    /* show what we have */
+  }
+  const me = player;
+  const today = dateKey();
+  const mine = me.daily?.[today];
+  const days = streak(me.daily, today);
+  const rows = dailyBoard(players, today);
+  const medal = ['🥇', '🥈', '🥉'];
+  const el = h(`
+    <div class="screen board-screen">
+      <header class="topbar">
+        <button class="icon-btn back" aria-label="Back">${ICONS.back}</button>
+        <div class="title-chip">Daily puzzle</div>
+        <div class="spacer"></div>
+      </header>
+      <div class="daily-hero">
+        <div class="daily-date">${prettyDate(today)}</div>
+        <p class="sub">Everyone gets the same board today. Your best score counts.</p>
+        <div class="daily-facts">
+          <span><b>${mine ?? '–'}</b><small>your best today</small></span>
+          <span><b>🔥 ${days}</b><small>${days === 1 ? 'day' : 'days'} in a row</small></span>
+        </div>
+        <button class="btn primary big-play play">${mine === undefined ? 'Play today’s puzzle' : 'Play again'}</button>
+      </div>
+      <h3 class="section-title">Today’s scores</h3>
+      <ol class="ranking">
+        ${rows
+          .map(({ player: p, score }, i) => `
+          <li class="${me.id === p.id ? 'me' : ''} ${score === null ? 'idle' : ''}">
+            <span class="rank">${score === null ? '–' : (medal[i] ?? i + 1)}</span>
+            ${avatar(p)}
+            <span class="who"><b>${esc(p.name)}</b><small>${score === null ? 'not played yet' : `🔥 ${streak(p.daily, today)} in a row`}</small></span>
+            <span class="stat"><b>${score ?? ''}</b></span>
+          </li>`)
+          .join('')}
+      </ol>
+    </div>`);
+  el.querySelector<HTMLElement>('.back')!.onclick = () => menu();
+  el.querySelector<HTMLElement>('.play')!.onclick = () => play({ kind: 'daily', date: today });
+  show(el);
 }
 
 function howTo(host: HTMLElement) {
@@ -570,7 +641,7 @@ function play(mode: Mode) {
       p.updatedAt = Date.now();
       store.savePlayer(code, p).catch((e) => console.warn('Could not save progress', e));
     },
-    onExit: () => (mode.kind === 'calm' ? menu() : levelMap()),
+    onExit: () => (mode.kind === 'calm' ? menu() : mode.kind === 'daily' ? void dailyScreen() : levelMap()),
     onNextLevel: (n) => play({ kind: 'challenge', level: n }),
   });
   show(view.el);

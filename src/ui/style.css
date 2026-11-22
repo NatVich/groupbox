@@ -1276,3 +1276,92 @@ h1 span:last-child {
   .ranking .calm { display: none; }
   .avatar-picker { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* ---------- daily puzzle ---------- */
+
+.daily-hero {
+  align-self: center;
+  width: min(100%, 640px);
+  margin-top: 16px;
+  padding: 20px;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.daily-date {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--pink);
+}
+
+.daily-hero .sub {
+  margin: 4px 0 12px;
+}
+
+.daily-facts {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  margin-bottom: 16px;
+}
+
+.daily-facts span {
+  display: flex;
+  flex-direction: column;
+  font-variant-numeric: tabular-nums;
+}
+
+.daily-facts b {
+  font-size: 2rem;
+}
+
+.daily-facts small {
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.big-play {
+  width: 100%;
+  min-height: 72px;
+  font-size: 1.6rem;
+}
+
+.section-title {
+  align-self: center;
+  width: min(100%, 640px);
+  margin: 20px 0 0;
+  font-size: 1.3rem;
+  color: var(--ink-soft);
+}
+
+.board-screen .ranking {
+  padding-top: 12px;
+}
+
+.ranking li.idle {
+  opacity: 0.65;
+}
+
+.save-warning {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(92%, 520px);
+  padding: 14px 18px;
+  border-radius: 18px;
+  background: #fff0c2;
+  color: #5c4300;
+  box-shadow: var(--shadow);
+  font-size: 1.05rem;
+  z-index: 50;
+  animation: card-in 0.4s cubic-bezier(0.34, 1.5, 0.64, 1);
+}
+
+@media (max-height: 820px) {
+  .menu { gap: 18px; padding-top: 68px; }
+  .btn.big { min-height: 76px; font-size: 1.5rem; }
+  .menu-buttons { gap: 12px; }
+}
