@@ -17,11 +17,18 @@ for a **+1000** bonus.
 - **Two modes:**
   - 🌿 **Calm:** no rush, unlimited undo and hints, no losing
   - 🏆 **Challenge:** 24 levels on a map, with 1–3 stars to earn on each
+  - 📅 **Daily puzzle:** the same board for everyone each day; your best score counts, with a
+    streak counter and today's family scores
 
 - **Player profiles:** each family member picks a name and a fruit-friend avatar and keeps
   their own stars and best scores. A **family leaderboard** compares everyone.
   Profiles are saved in **Firebase** and shared across devices with a family code
   (like `PEAR-4821`). See [`docs/firebase-setup.md`](docs/firebase-setup.md).
+
+- **Two looks:** switch between 🍓 **Fruit** (soft and cartoony) and 👾 **Retro** (a pixel-art
+  arcade with a CRT screen, chiptune sounds and frame-by-frame motion) from the menu.
+- **Pixel effects:** sparkle bursts, POW!, poofs, fireworks and confetti from
+  [pixelfx](https://github.com/patch-gg/pixelfx) (MIT).
 
 Big buttons, one tap to pop (with an optional "tap twice" safety), gentle sounds with a mute
 button, and progress saved in the browser. It can be installed as an app (PWA) and works
@@ -45,3 +52,7 @@ The design spec is in [`docs/specs/2026-11-22-groupbox-design.md`](docs/specs/20
 Every push to `main` builds the game, runs the tests and publishes it to GitHub Pages
 (`.github/workflows/deploy.yml`). One-time setup: in the repository's **Settings → Pages**,
 set **Source** to **GitHub Actions**.
+
+## Credits
+Pixel-art effects: [pixelfx](https://github.com/patch-gg/pixelfx) by Patch and Hugo Duprez, MIT License.
+Fonts: Fredoka, Press Start 2P and VT323 from Google Fonts (SIL Open Font License).

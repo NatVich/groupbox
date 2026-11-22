@@ -7,6 +7,8 @@ export interface Player {
   levelStars: Record<string, number>;
   levelBest: Record<string, number>;
   calmBest: number;
+  /** Best score for each daily puzzle, by date (YYYY-MM-DD). Absent until the first daily is played. */
+  daily?: Record<string, number>;
   updatedAt: number;
 }
 
@@ -24,6 +26,8 @@ export interface ProfileStore {
   listPlayers(code: string): Promise<Player[]>;
   savePlayer(code: string, player: Player): Promise<void>;
   deletePlayer(code: string, id: string): Promise<void>;
+  /** Called when a background save fails (for example the database rules are out of date). */
+  onSaveError?: (e: Error) => void;
 }
 
 /** A problem with the Firebase project setup, with a message a parent can act on. */
@@ -79,4 +83,11 @@ export function makeFamilyCode(rand: () => number = Math.random): string {
 export function normalizeFamilyCode(input: string): string | null {
   const m = input.toUpperCase().replace(/[^A-Z0-9]/g, '').match(/^([A-Z]+)(\d{4})$/);
   return m ? `${m[1]}-${m[2]}` : null;
+}
+
+/** Players ranked by their best score on a given day; players who haven't played come last. */
+export function dailyBoard(players: Player[], date: string): { player: Player; score: number | null }[] {
+  return players
+    .map((player) => ({ player, score: player.daily?.[date] ?? null }))
+    .sort((a, b) => (b.score ?? -1) - (a.score ?? -1) || a.player.name.localeCompare(b.player.name));
 }

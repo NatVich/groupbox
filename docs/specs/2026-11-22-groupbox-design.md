@@ -53,6 +53,17 @@ blinks while idle, wiggles when selected and pops when cleared.
 Bright, rounded cartoon style; big buttons, chunky type; bouncing landings, confetti on
 board clear, floating score popups; gentle synthesized sounds (WebAudio) with mute toggle.
 
+## Daily puzzle
+- One board per calendar date (seeded from the date), the same for every player.
+- Best score of the day counts; streak = days in a row played; daily screen ranks the family for today.
+- Stored per player as `daily: { 'YYYY-MM-DD': score }` (last 60 days).
+
+## Skins and effects
+- Device setting `skin`: `fruit` (default) or `retro` (12×12 pixel sprites, CRT scanlines, Press Start 2P
+  and VT323 fonts, square-wave sounds, stepped animations). Set on `<html data-skin>`.
+- pixelfx effects on a canvas over the board: collect burst (fruit-coloured) on pops, firework for 10+,
+  POW for bombs, poof for gifts, confetti and fireworks before a win card. Skipped with reduced motion.
+
 ## Architecture
 - `src/game/` — pure logic, no DOM: `rng`, `board`, `rules` (groups, gravity, scoring,
   gifts, power-ups), `levels`. Fully unit tested with Vitest.

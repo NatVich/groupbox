@@ -14,15 +14,17 @@ import {
   paint,
   paintTarget,
 } from '../game/rules';
+import { dailyLevel, prettyDate, pruneDaily, startDaily, streak } from '../game/daily';
 import { getLevel, Level, LEVEL_COUNT, startLevel, starsFor } from '../game/levels';
 import type { GameState, MoveEvents, Pos, Tile } from '../game/types';
 import { ICONS, tileSvg } from './art';
 import { confetti } from './fx';
+import { FRUIT_RAMPS, PixelFxLayer } from './pixel-fx';
 import { sfx } from './sound';
 import type { Player } from '../data/types';
 import type { DeviceSettings } from './store';
 
-export type Mode = { kind: 'calm' } | { kind: 'challenge'; level: number };
+export type Mode = { kind: 'calm' } | { kind: 'challenge'; level: number } | { kind: 'daily'; date: string };
 
 export interface GameCallbacks {
   player: Player;
@@ -63,6 +65,7 @@ export class GameView {
   private boardEl!: HTMLElement;
   private wrapEl!: HTMLElement;
   private resizeObs: ResizeObserver;
+  private fx: PixelFxLayer;
 
   constructor(private mode: Mode, private cb: GameCallbacks) {
     this.el = document.createElement('div');
@@ -70,6 +73,7 @@ export class GameView {
     this.el.innerHTML = this.template();
     this.boardEl = this.q('.board');
     this.wrapEl = this.q('.board-wrap');
+    this.fx = new PixelFxLayer(this.boardEl);
     this.bindControls();
     this.resizeObs = new ResizeObserver(() => this.layout());
     this.resizeObs.observe(this.wrapEl);
@@ -78,6 +82,13 @@ export class GameView {
 
   destroy() {
     this.resizeObs.disconnect();
+    this.fx.destroy();
+  }
+
+  private title(): string {
+    if (this.mode.kind === 'calm') return 'Calm play';
+    if (this.mode.kind === 'daily') return `Daily · ${prettyDate(this.mode.date)}`;
+    return `Level ${this.mode.level}`;
   }
 
   private q<T extends HTMLElement = HTMLElement>(sel: string): T {
@@ -85,11 +96,11 @@ export class GameView {
   }
 
   private template(): string {
-    const challenge = this.mode.kind === 'challenge';
+    const challenge = this.mode.kind !== 'calm';
     return `
       <header class="topbar">
         <button class="icon-btn back" aria-label="Back to menu">${ICONS.back}</button>
-        <div class="title-chip">${challenge ? `Level ${(this.mode as { level: number }).level}` : 'Calm play'}</div>
+        <div class="title-chip">${this.title()}</div>
         <div class="score-box"><span class="label">Score</span><span class="score">0</span></div>
       </header>
       <div class="goal">
@@ -127,6 +138,11 @@ export class GameView {
     if (this.mode.kind === 'calm') {
       this.state = newGame(CALM, makeRng(Date.now() & 0xffffffff));
       this.level = null;
+    } else if (this.mode.kind === 'daily') {
+      this.level = dailyLevel(this.mode.date);
+      this.state = startDaily(this.mode.date);
+      this.undosLeft = CHALLENGE_UNDOS;
+      this.hintsLeft = CHALLENGE_HINTS;
     } else {
       this.level = getLevel(this.mode.level);
       this.state = startLevel(this.level);
@@ -139,6 +155,7 @@ export class GameView {
     this.painting = false;
     this.clearSelection();
     this.q('.overlay').classList.add('hidden');
+    this.fx.clear();
     for (const el of this.tiles.values()) el.remove();
     this.tiles.clear();
     this.layout();
@@ -156,6 +173,7 @@ export class GameView {
     this.boardEl.style.width = `${s * cols}px`;
     this.boardEl.style.height = `${s * rows}px`;
     this.boardEl.style.setProperty('--s', `${s}px`);
+    this.fx.resize(s * cols, s * rows);
     for (const [id, el] of this.tiles) {
       const p = this.posOf(id);
       if (p) this.place(el, p);
@@ -402,6 +420,7 @@ export class GameView {
       }
     }
 
+    this.playEffects(ev, before, tapped);
     if (ev.exploded) {
       sfx.boom();
       this.retrigger(this.boardEl, 'quake');
@@ -428,6 +447,36 @@ export class GameView {
       if (!hasMoves(this.state)) setTimeout(() => this.endRound(), 600);
     }, ev.cleared.length ? 140 : 0);
     this.updateHud();
+  }
+
+  /** Pixel-art effects for a move: a fruit-coloured burst, POW for bombs, a poof for each gift. */
+  private playEffects(ev: MoveEvents, before: GameState, tapped: Pos) {
+    const px = (x: number) => (x + 0.5) * this.size;
+    if (ev.exploded) {
+      this.fx.play('pow', px(tapped.x), px(tapped.y));
+    } else if (ev.painted) {
+      this.fx.play('burst', px(tapped.x), px(tapped.y), { palette: FRUIT_RAMPS[2] });
+    } else if (ev.cleared.length) {
+      const cx = ev.cleared.reduce((a, c) => a + c.x, 0) / ev.cleared.length;
+      const cy = ev.cleared.reduce((a, c) => a + c.y, 0) / ev.cleared.length;
+      const fruitTile = ev.cleared
+        .map((c) => at(before.board, c.x, c.y))
+        .find((t) => t?.kind === 'fruit') as Extract<Tile, { kind: 'fruit' }> | undefined;
+      const palette = FRUIT_RAMPS[fruitTile?.fruit ?? 0];
+      this.fx.play('burst', px(cx), px(cy), { palette });
+      if (ev.cleared.length >= 10) this.fx.play('firework', px(cx), px(cy) - this.size, { palette });
+    }
+    for (const o of ev.opened) this.fx.play('poof', px(o.x), px(o.y));
+  }
+
+  /** Fireworks and confetti over the board before the results card appears. */
+  private celebrate() {
+    const { cols, rows } = this.state.board;
+    const w = cols * this.size;
+    const h = rows * this.size;
+    this.fx.play('confetti', w / 2, h);
+    this.fx.play('firework', w * 0.3, h * 0.35, { palette: FRUIT_RAMPS[0] });
+    setTimeout(() => this.fx.play('firework', w * 0.7, h * 0.3, { palette: FRUIT_RAMPS[3] }), 350);
   }
 
   private floatScore(ev: MoveEvents, tapped: Pos) {
@@ -495,7 +544,32 @@ export class GameView {
     const ov = this.q('.overlay');
     let html: string;
 
-    if (this.level) {
+    if (this.mode.kind === 'daily') {
+      const date = this.mode.date;
+      const stars = starsFor(this.level!, this.state.score);
+      const before = d.daily?.[date];
+      const best = before === undefined || this.state.score > before;
+      d.daily = pruneDaily({ ...(d.daily ?? {}), [date]: Math.max(before ?? 0, this.state.score) });
+      this.cb.persist();
+      const days = streak(d.daily, date);
+      html = `
+        <div class="card results">
+          <h2>${stars === 3 ? 'Perfect day!' : stars > 0 ? 'Nice one!' : 'Good try!'}</h2>
+          <div class="big-stars">${[0, 1, 2].map((i) => `<span class="${i < stars ? 'on' : ''}" style="animation-delay:${300 + i * 350}ms">${ICONS.star}</span>`).join('')}</div>
+          ${bonus ? `<p class="bonus">🎉 Board cleared! +${bonus}</p>` : ''}
+          <p class="final">Score <b>${this.state.score}</b></p>
+          <p class="${best ? 'bonus' : 'sub'}">${best ? "🏅 Your best today!" : `Your best today: ${d.daily[date]}`}</p>
+          <p class="sub">🔥 ${days} ${days === 1 ? 'day' : 'days'} in a row</p>
+          <div class="actions">
+            <button class="btn primary board">See today’s scores</button>
+            <button class="btn retry">Try for a higher score</button>
+          </div>
+        </div>`;
+      if (stars > 0 || bonus) {
+        sfx.win();
+        confetti(this.el, stars * 40 + (cleared ? 60 : 0));
+      } else sfx.done();
+    } else if (this.level) {
       const n = this.level.number;
       const stars = starsFor(this.level, this.state.score);
       const prevStars = d.levelStars[n] ?? 0;
@@ -542,7 +616,9 @@ export class GameView {
     }
 
     ov.innerHTML = html;
-    ov.classList.remove('hidden');
+    const party = cleared || /class="on"/.test(html) || /New best/.test(html);
+    if (party) this.celebrate();
+    setTimeout(() => ov.classList.remove('hidden'), party ? 1300 : 0);
     const on = (sel: string, fn: () => void) => {
       const b = ov.querySelector<HTMLElement>(sel);
       if (b) b.onclick = fn;
@@ -552,5 +628,6 @@ export class GameView {
     on('.again', () => this.start());
     on('.map', () => this.cb.onExit());
     on('.menu', () => this.cb.onExit());
+    on('.board', () => this.cb.onExit());
   }
 }

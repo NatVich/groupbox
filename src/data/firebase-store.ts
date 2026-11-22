@@ -40,6 +40,7 @@ function friendly(e: unknown): Error {
  */
 export class FirebaseStore implements ProfileStore {
   readonly kind = 'firebase';
+  onSaveError?: (e: Error) => void;
   private db: Firestore;
   private ready: Promise<unknown>;
 
@@ -103,9 +104,10 @@ export class FirebaseStore implements ProfileStore {
   async savePlayer(code: string, player: Player): Promise<void> {
     await this.ready;
     // Not awaited past the local write: offline play still saves, and syncs later.
-    setDoc(doc(this.db, 'families', code, 'players', player.id), { ...player, updatedAt: Date.now() }).catch((e) =>
-      console.warn('Could not save progress to Firebase', e),
-    );
+    setDoc(doc(this.db, 'families', code, 'players', player.id), { ...player, updatedAt: Date.now() }).catch((e) => {
+      console.warn('Could not save progress to Firebase', e);
+      this.onSaveError?.(friendly(e));
+    });
   }
 
   async deletePlayer(code: string, id: string): Promise<void> {
