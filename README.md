@@ -22,6 +22,8 @@ Big buttons, a two-tap safety (you can switch to one-tap pop), gentle sounds wit
 button, and progress saved in the browser. It can be installed as an app (PWA) and works
 offline.
 
+**Play online:** https://natvich.github.io/groupbox/
+
 ## Develop
 
 ```bash
@@ -32,3 +34,9 @@ npm run build    # production build in dist/
 ```
 
 The design spec is in [`docs/specs/2026-11-22-groupbox-design.md`](docs/specs/2026-11-22-groupbox-design.md).
+
+## Deploy
+
+Every push to `main` builds the game, runs the tests and publishes it to GitHub Pages
+(`.github/workflows/deploy.yml`). One-time setup: in the repository's **Settings → Pages**,
+set **Source** to **GitHub Actions**.
