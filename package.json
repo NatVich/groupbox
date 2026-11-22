@@ -15,6 +15,7 @@
     "vitest": "^3.2.7"
   },
   "dependencies": {
-    "firebase": "^12.19.0"
+    "firebase": "^12.19.0",
+    "pixelfx": "github:patch-gg/pixelfx#5294518ce7c72e48b6100a744596e0acf57f2826"
   }
 }

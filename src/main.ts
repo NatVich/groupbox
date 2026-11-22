@@ -18,14 +18,22 @@ import { FRUITS } from './game/types';
 import { dateKey, prettyDate, streak } from './game/daily';
 import { getLevel, LEVEL_COUNT } from './game/levels';
 import { groupPoints } from './game/rules';
-import { fruitSvg, ICONS, tileSvg } from './ui/art';
+import { fruitSvg, ICONS, setSkin, Skin, tileSvg } from './ui/art';
 import { GameView, Mode } from './ui/game-view';
-import { setMuted, sfx } from './ui/sound';
+import { setMuted, setRetroSound, sfx } from './ui/sound';
 import { clearLegacy, legacyProgress, loadSettings, saveSettings } from './ui/store';
 
 const app = document.getElementById('app')!;
 const settings = loadSettings();
 setMuted(settings.muted);
+applySkin(settings.skin ?? 'fruit');
+
+function applySkin(s: Skin) {
+  setSkin(s);
+  setRetroSound(s === 'retro');
+  document.documentElement.dataset.skin = s;
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content', s === 'retro' ? '#0b0b1e' : '#ffb4c8');
+}
 
 let store: ProfileStore;
 let family: Family | null = null;
@@ -477,6 +485,10 @@ function menu() {
       <div class="settings">
         <button class="toggle sound" aria-pressed="${!settings.muted}">${settings.muted ? ICONS.mute : ICONS.sound}<span>Sound</span></button>
         <button class="toggle twotap" aria-pressed="${settings.twoTap}"><span class="dot"></span><span>Tap twice to pop</span></button>
+        <div class="skin-switch" role="radiogroup" aria-label="Game look">
+          <button role="radio" data-skin="fruit" aria-checked="${(settings.skin ?? 'fruit') === 'fruit'}">🍓 Fruit</button>
+          <button role="radio" data-skin="retro" aria-checked="${settings.skin === 'retro'}">👾 Retro</button>
+        </div>
       </div>
     </div>`);
   el.querySelector<HTMLElement>('.player-chip')!.onclick = () => whoIsPlaying();
@@ -494,6 +506,17 @@ function menu() {
     sound.firstElementChild!.outerHTML = settings.muted ? ICONS.mute : ICONS.sound;
     sfx.select();
   };
+  el.querySelectorAll<HTMLElement>('.skin-switch button').forEach((b) => {
+    b.onclick = () => {
+      const s = b.dataset.skin as Skin;
+      if (s === (settings.skin ?? 'fruit')) return;
+      settings.skin = s;
+      saveSettings(settings);
+      applySkin(s);
+      sfx.gift();
+      menu();
+    };
+  });
   const twoTap = el.querySelector<HTMLElement>('.twotap')!;
   twoTap.onclick = () => {
     settings.twoTap = !settings.twoTap;

@@ -1,6 +1,12 @@
 /** Tiny synthesized sound effects (no audio files needed). */
 let ctx: AudioContext | null = null;
 let muted = false;
+let retro = false;
+
+/** Retro skin: square-wave chiptune blips instead of soft tones. */
+export function setRetroSound(on: boolean) {
+  retro = on;
+}
 
 export function setMuted(m: boolean) {
   muted = m;
@@ -23,11 +29,11 @@ function tone(freq: number, start: number, dur: number, type: OscillatorType = '
   const t0 = a.currentTime + start;
   const o = a.createOscillator();
   const g = a.createGain();
-  o.type = type;
+  o.type = retro ? 'square' : type;
   o.frequency.setValueAtTime(freq, t0);
   if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
   g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+  g.gain.exponentialRampToValueAtTime(retro ? vol * 0.45 : vol, t0 + 0.01);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
   o.connect(g).connect(a.destination);
   o.start(t0);

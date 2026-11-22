@@ -1,5 +1,9 @@
 /** Settings for this device (not per player), kept in this browser only. */
+import type { Skin } from './art';
+
 export interface DeviceSettings {
+  /** Look of the game: fruit friends or retro pixel arcade. */
+  skin?: Skin;
   muted: boolean;
   /** Ask for a second tap before popping (off by default: one tap pops). */
   twoTap: boolean;

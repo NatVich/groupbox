@@ -19,6 +19,7 @@ import { getLevel, Level, LEVEL_COUNT, startLevel, starsFor } from '../game/leve
 import type { GameState, MoveEvents, Pos, Tile } from '../game/types';
 import { ICONS, tileSvg } from './art';
 import { confetti } from './fx';
+import { FRUIT_RAMPS, PixelFxLayer } from './pixel-fx';
 import { sfx } from './sound';
 import type { Player } from '../data/types';
 import type { DeviceSettings } from './store';
@@ -64,6 +65,7 @@ export class GameView {
   private boardEl!: HTMLElement;
   private wrapEl!: HTMLElement;
   private resizeObs: ResizeObserver;
+  private fx: PixelFxLayer;
 
   constructor(private mode: Mode, private cb: GameCallbacks) {
     this.el = document.createElement('div');
@@ -71,6 +73,7 @@ export class GameView {
     this.el.innerHTML = this.template();
     this.boardEl = this.q('.board');
     this.wrapEl = this.q('.board-wrap');
+    this.fx = new PixelFxLayer(this.boardEl);
     this.bindControls();
     this.resizeObs = new ResizeObserver(() => this.layout());
     this.resizeObs.observe(this.wrapEl);
@@ -79,6 +82,7 @@ export class GameView {
 
   destroy() {
     this.resizeObs.disconnect();
+    this.fx.destroy();
   }
 
   private title(): string {
@@ -151,6 +155,7 @@ export class GameView {
     this.painting = false;
     this.clearSelection();
     this.q('.overlay').classList.add('hidden');
+    this.fx.clear();
     for (const el of this.tiles.values()) el.remove();
     this.tiles.clear();
     this.layout();
@@ -168,6 +173,7 @@ export class GameView {
     this.boardEl.style.width = `${s * cols}px`;
     this.boardEl.style.height = `${s * rows}px`;
     this.boardEl.style.setProperty('--s', `${s}px`);
+    this.fx.resize(s * cols, s * rows);
     for (const [id, el] of this.tiles) {
       const p = this.posOf(id);
       if (p) this.place(el, p);
@@ -414,6 +420,7 @@ export class GameView {
       }
     }
 
+    this.playEffects(ev, before, tapped);
     if (ev.exploded) {
       sfx.boom();
       this.retrigger(this.boardEl, 'quake');
@@ -440,6 +447,36 @@ export class GameView {
       if (!hasMoves(this.state)) setTimeout(() => this.endRound(), 600);
     }, ev.cleared.length ? 140 : 0);
     this.updateHud();
+  }
+
+  /** Pixel-art effects for a move: a fruit-coloured burst, POW for bombs, a poof for each gift. */
+  private playEffects(ev: MoveEvents, before: GameState, tapped: Pos) {
+    const px = (x: number) => (x + 0.5) * this.size;
+    if (ev.exploded) {
+      this.fx.play('pow', px(tapped.x), px(tapped.y));
+    } else if (ev.painted) {
+      this.fx.play('burst', px(tapped.x), px(tapped.y), { palette: FRUIT_RAMPS[2] });
+    } else if (ev.cleared.length) {
+      const cx = ev.cleared.reduce((a, c) => a + c.x, 0) / ev.cleared.length;
+      const cy = ev.cleared.reduce((a, c) => a + c.y, 0) / ev.cleared.length;
+      const fruitTile = ev.cleared
+        .map((c) => at(before.board, c.x, c.y))
+        .find((t) => t?.kind === 'fruit') as Extract<Tile, { kind: 'fruit' }> | undefined;
+      const palette = FRUIT_RAMPS[fruitTile?.fruit ?? 0];
+      this.fx.play('burst', px(cx), px(cy), { palette });
+      if (ev.cleared.length >= 10) this.fx.play('firework', px(cx), px(cy) - this.size, { palette });
+    }
+    for (const o of ev.opened) this.fx.play('poof', px(o.x), px(o.y));
+  }
+
+  /** Fireworks and confetti over the board before the results card appears. */
+  private celebrate() {
+    const { cols, rows } = this.state.board;
+    const w = cols * this.size;
+    const h = rows * this.size;
+    this.fx.play('confetti', w / 2, h);
+    this.fx.play('firework', w * 0.3, h * 0.35, { palette: FRUIT_RAMPS[0] });
+    setTimeout(() => this.fx.play('firework', w * 0.7, h * 0.3, { palette: FRUIT_RAMPS[3] }), 350);
   }
 
   private floatScore(ev: MoveEvents, tapped: Pos) {
@@ -579,7 +616,9 @@ export class GameView {
     }
 
     ov.innerHTML = html;
-    ov.classList.remove('hidden');
+    const party = cleared || /class="on"/.test(html) || /New best/.test(html);
+    if (party) this.celebrate();
+    setTimeout(() => ov.classList.remove('hidden'), party ? 1300 : 0);
     const on = (sel: string, fn: () => void) => {
       const b = ov.querySelector<HTMLElement>(sel);
       if (b) b.onclick = fn;

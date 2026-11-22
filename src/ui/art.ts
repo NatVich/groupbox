@@ -1,4 +1,17 @@
 import type { GiftType, Tile } from '../game/types';
+import { retroFruit, retroTile } from './retro-art';
+
+export type Skin = 'fruit' | 'retro';
+let skin: Skin = 'fruit';
+
+/** Picks the artwork set used for tiles and avatars from now on. */
+export function setSkin(s: Skin) {
+  skin = s;
+}
+
+export function getSkin(): Skin {
+  return skin;
+}
 
 /** Inline SVG artwork. Every fruit has its own colour AND silhouette (colour-blind friendly). */
 
@@ -83,6 +96,7 @@ const RAINBOW_SVG = `
   ${face(50, 66, 0.75)}`;
 
 export function tileSvg(t: Tile): string {
+  if (skin === 'retro') return retroTile(t);
   let body: string;
   switch (t.kind) {
     case 'fruit':
@@ -102,6 +116,7 @@ export function tileSvg(t: Tile): string {
 }
 
 export function fruitSvg(i: number): string {
+  if (skin === 'retro') return retroFruit(i);
   return `<svg viewBox="0 0 100 100" aria-hidden="true">${FRUIT_SVG[i]}</svg>`;
 }
 
