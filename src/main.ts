@@ -63,14 +63,14 @@ function menu() {
     sfx.select();
   };
   show(el);
-  if (!localStorage.getItem('groupbox-seen-howto')) {
-    try {
-      localStorage.setItem('groupbox-seen-howto', '1');
-    } catch {
-      /* ignore */
-    }
-    howTo(el);
+  let seen = false;
+  try {
+    seen = !!localStorage.getItem('groupbox-seen-howto');
+    localStorage.setItem('groupbox-seen-howto', '1');
+  } catch {
+    /* storage blocked: just show the guide */
   }
+  if (!seen) howTo(el);
 }
 
 function howTo(host: HTMLElement) {
