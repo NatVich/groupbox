@@ -1,0 +1,48 @@
+rules_version = '2';
+
+// GroupBox: families are reached by their exact code (e.g. PEAR-4821); they can never be listed.
+// Every device signs in anonymously first.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function familyExists(code) {
+      return exists(/databases/$(database)/documents/families/$(code));
+    }
+
+    function starMap(m) {
+      return m is map && m.size() <= 50;
+    }
+
+    function validPlayer(id) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['id', 'name', 'avatar', 'levelStars', 'levelBest', 'calmBest', 'updatedAt'])
+        && d.keys().hasAll(['id', 'name', 'avatar', 'levelStars', 'levelBest', 'calmBest'])
+        && d.id == id
+        && d.name is string && d.name.size() >= 1 && d.name.size() <= 20
+        && d.avatar is int && d.avatar >= 0 && d.avatar <= 5
+        && starMap(d.levelStars) && starMap(d.levelBest)
+        && d.calmBest is int && d.calmBest >= 0;
+    }
+
+    match /families/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && code.matches('^[A-Z]+-[0-9]{4}$')
+        && request.resource.data.keys().hasOnly(['name', 'createdAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 40;
+      allow update, delete: if false;
+
+      match /players/{playerId} {
+        allow read: if signedIn() && familyExists(code);
+        allow create, update: if signedIn() && familyExists(code) && validPlayer(playerId);
+        allow delete: if signedIn() && familyExists(code);
+      }
+    }
+  }
+}

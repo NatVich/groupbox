@@ -1,0 +1,14 @@
+{
+  "name": "GroupBox",
+  "short_name": "GroupBox",
+  "description": "Pop groups of fruit friends! A cheerful puzzle for kids and grown-ups.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffe0ec",
+  "theme_color": "#ffb4c8",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
