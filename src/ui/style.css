@@ -481,7 +481,7 @@ h1 span:last-child {
 }
 
 .tile.popping .tile-inner {
-  animation: pop 0.35s ease-in forwards;
+  animation: pop 0.24s ease-in forwards;
 }
 
 @keyframes pop {

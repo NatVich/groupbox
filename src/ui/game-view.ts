@@ -265,7 +265,7 @@ export class GameView {
       el.innerHTML = 'Tap a fruit to repaint it 🎨';
     } else if (this.selectionKind === 'group') {
       const n = this.selection.length;
-      el.innerHTML = `<b>${n}</b> fruit → <b>+${groupPoints(n)}</b> ${this.cb.data.oneTap ? '' : '· tap again!'}`;
+      el.innerHTML = `<b>${n}</b> fruit → <b>+${groupPoints(n)}</b> ${this.cb.data.twoTap ? '· tap again!' : ''}`;
     } else if (this.selectionKind === 'bomb') {
       el.innerHTML = 'Tap the bomb again to go BOOM! 💥';
     } else {
@@ -305,7 +305,7 @@ export class GameView {
 
     const selected = this.selection.some((q) => q.x === p.x && q.y === p.y);
     if (t.kind === 'bomb') {
-      if ((this.selectionKind === 'bomb' && selected) || this.cb.data.oneTap) {
+      if ((this.selectionKind === 'bomb' && selected) || !this.cb.data.twoTap) {
         this.commit(() => detonate(this.state, p), p);
       } else {
         this.select(this.blastArea(p), 'bomb');
@@ -326,7 +326,7 @@ export class GameView {
       this.clearSelection();
       return;
     }
-    if (this.cb.data.oneTap) {
+    if (!this.cb.data.twoTap) {
       this.commit(() => clearGroup(this.state, p), p);
     } else {
       this.select(g, 'group');
@@ -385,7 +385,7 @@ export class GameView {
       el.classList.add('popping');
       el.style.transitionDelay = '0ms';
       (el.firstElementChild as HTMLElement).style.animationDelay = `${Math.random() * 60}ms`;
-      setTimeout(() => el.remove(), 380);
+      setTimeout(() => el.remove(), 260);
     }
     // Collected gifts (brush/star) fly away.
     for (const o of ev.opened) {
@@ -423,7 +423,7 @@ export class GameView {
       this.updateHud();
       this.busy = false;
       if (!hasMoves(this.state)) setTimeout(() => this.endRound(), 600);
-    }, ev.cleared.length ? 220 : 0);
+    }, ev.cleared.length ? 140 : 0);
     this.updateHud();
   }
 

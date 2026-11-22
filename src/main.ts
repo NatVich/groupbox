@@ -40,7 +40,7 @@ function menu() {
       </div>
       <div class="settings">
         <button class="toggle sound" aria-pressed="${!data.muted}">${data.muted ? ICONS.mute : ICONS.sound}<span>Sound</span></button>
-        <button class="toggle onetap" aria-pressed="${data.oneTap}"><span class="dot"></span><span>One-tap pop</span></button>
+        <button class="toggle twotap" aria-pressed="${data.twoTap}"><span class="dot"></span><span>Tap twice to pop</span></button>
       </div>
     </div>`);
   el.querySelector<HTMLElement>('.calm')!.onclick = () => play({ kind: 'calm' });
@@ -55,11 +55,11 @@ function menu() {
     sound.firstElementChild!.outerHTML = data.muted ? ICONS.mute : ICONS.sound;
     sfx.select();
   };
-  const oneTap = el.querySelector<HTMLElement>('.onetap')!;
-  oneTap.onclick = () => {
-    data.oneTap = !data.oneTap;
+  const twoTap = el.querySelector<HTMLElement>('.twotap')!;
+  twoTap.onclick = () => {
+    data.twoTap = !data.twoTap;
     save(data);
-    oneTap.setAttribute('aria-pressed', String(data.oneTap));
+    twoTap.setAttribute('aria-pressed', String(data.twoTap));
     sfx.select();
   };
   show(el);
@@ -80,7 +80,7 @@ function howTo(host: HTMLElement) {
         <h2>How to play</h2>
         <ol>
           <li><div class="demo">${fruitSvg(0)}${fruitSvg(0)}${fruitSvg(0)}</div>
-            <p>Tap a group of <b>2 or more</b> matching fruit touching side by side. Tap again to pop them!</p></li>
+            <p>Tap a group of <b>2 or more</b> matching fruit touching side by side to pop them!</p></li>
           <li><div class="demo nums"><span>3 → <b>+${groupPoints(3)}</b></span><span>6 → <b>+${groupPoints(6)}</b></span><span>10 → <b>+${groupPoints(10)}</b></span></div>
             <p><b>Bigger groups score way more.</b> Join fruit together before you pop.</p></li>
           <li><div class="demo">${tileSvg({ kind: 'gift', id: 0, gift: 'star' })}</div>

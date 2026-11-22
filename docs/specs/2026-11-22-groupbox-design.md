@@ -10,8 +10,8 @@ surprise gift boxes, and two play modes (Calm and Challenge).
 
 ## Core rules
 - Board is a grid of fruit tiles (columns × rows).
-- Tap a tile to highlight its group (2+ orthogonally connected tiles of the same fruit);
-  tap again to clear it. Tapping elsewhere changes selection. (Setting: one-tap clear.)
+- Tap a tile to clear its group (2+ orthogonally connected tiles of the same fruit);
+  one tap pops it. (Setting: "Tap twice to pop" highlights first, second tap clears.)
 - After clearing, tiles fall down; empty columns shift left.
 - Score for clearing n tiles: (n − 2)².
 - End of round when no groups of 2+ remain and no usable power-ups.

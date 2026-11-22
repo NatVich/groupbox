@@ -18,7 +18,7 @@ for a **+1000** bonus.
   - 🌿 **Calm:** no rush, unlimited undo and hints, no losing
   - 🏆 **Challenge:** 24 levels on a map, with 1–3 stars to earn on each
 
-Big buttons, a two-tap safety (you can switch to one-tap pop), gentle sounds with a mute
+Big buttons, one tap to pop (with an optional "tap twice" safety), gentle sounds with a mute
 button, and progress saved in the browser. It can be installed as an app (PWA) and works
 offline.
 

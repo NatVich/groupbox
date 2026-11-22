@@ -4,12 +4,13 @@ export interface SaveData {
   levelBest: Record<number, number>;
   calmBest: number;
   muted: boolean;
-  oneTap: boolean;
+  /** Ask for a second tap before popping (off by default: one tap pops). */
+  twoTap: boolean;
 }
 
 const KEY = 'groupbox-save-v1';
 
-const defaults = (): SaveData => ({ levelStars: {}, levelBest: {}, calmBest: 0, muted: false, oneTap: false });
+const defaults = (): SaveData => ({ levelStars: {}, levelBest: {}, calmBest: 0, muted: false, twoTap: false });
 
 export function load(): SaveData {
   try {
