@@ -13,7 +13,21 @@ import {
   serverTimestamp,
   setDoc,
 } from 'firebase/firestore';
-import { Family, makeFamilyCode, Player, ProfileStore } from './types';
+import { Family, makeFamilyCode, Player, ProfileStore, SetupError } from './types';
+
+/** Turns Firebase error codes into messages that say which console setting to fix. */
+function friendly(e: unknown): Error {
+  const code = String((e as { code?: string })?.code ?? '');
+  if (code === 'auth/configuration-not-found' || code === 'auth/operation-not-allowed' || code === 'auth/admin-restricted-operation')
+    return new SetupError('Sign-in is not switched on yet. In the Firebase console, open Authentication, then Sign-in method, and turn on Anonymous.');
+  if (code === 'auth/unauthorized-domain')
+    return new SetupError('This website address is not allowed yet. In the Firebase console, open Authentication, then Settings, then Authorized domains, and add it.');
+  if (code === 'permission-denied')
+    return new SetupError('Firebase refused the request. In the Firebase console, open Firestore Database, then Rules, and publish the rules from firestore.rules.');
+  if (code === 'failed-precondition' || code === 'not-found')
+    return new SetupError('The database is not created yet. In the Firebase console, open Firestore Database and click Create database.');
+  return e instanceof Error ? e : new Error(String(e));
+}
 
 /**
  * Profiles in Cloud Firestore, shared across devices by family code.
@@ -31,7 +45,10 @@ export class FirebaseStore implements ProfileStore {
 
   constructor(config: FirebaseOptions) {
     const app = initializeApp(config);
-    this.ready = signInAnonymously(getAuth(app));
+    this.ready = signInAnonymously(getAuth(app)).catch((e) => {
+      throw friendly(e);
+    });
+    this.ready.catch(() => {}); // reported when a call awaits it, not as an unhandled rejection
     let db: Firestore;
     try {
       db = initializeFirestore(app, {
@@ -45,6 +62,14 @@ export class FirebaseStore implements ProfileStore {
 
   async createFamily(name: string): Promise<Family> {
     await this.ready;
+    try {
+      return await this.tryCreateFamily(name);
+    } catch (e) {
+      throw friendly(e);
+    }
+  }
+
+  private async tryCreateFamily(name: string): Promise<Family> {
     for (let i = 0; i < 10; i++) {
       const code = makeFamilyCode();
       const ref = doc(this.db, 'families', code);
@@ -57,14 +82,22 @@ export class FirebaseStore implements ProfileStore {
 
   async getFamily(code: string): Promise<Family | null> {
     await this.ready;
-    const snap = await getDoc(doc(this.db, 'families', code));
-    return snap.exists() ? { code, name: String(snap.data().name ?? 'Family') } : null;
+    try {
+      const snap = await getDoc(doc(this.db, 'families', code));
+      return snap.exists() ? { code, name: String(snap.data().name ?? 'Family') } : null;
+    } catch (e) {
+      throw friendly(e);
+    }
   }
 
   async listPlayers(code: string): Promise<Player[]> {
     await this.ready;
-    const snap = await getDocs(collection(this.db, 'families', code, 'players'));
-    return snap.docs.map((d) => d.data() as Player);
+    try {
+      const snap = await getDocs(collection(this.db, 'families', code, 'players'));
+      return snap.docs.map((d) => d.data() as Player);
+    } catch (e) {
+      throw friendly(e);
+    }
   }
 
   async savePlayer(code: string, player: Player): Promise<void> {

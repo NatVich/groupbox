@@ -10,6 +10,7 @@ import {
   normalizeFamilyCode,
   Player,
   ProfileStore,
+  SetupError,
   totalStars,
 } from './data/types';
 import { FRUITS } from './game/types';
@@ -81,7 +82,11 @@ async function boot() {
     else whoIsPlaying();
   } catch (e) {
     console.error(e);
-    message('Can’t reach GroupBox', 'Check the internet connection, then try again.', boot);
+    message(
+      e instanceof SetupError ? 'One more setup step' : 'Can’t reach GroupBox',
+      e instanceof SetupError ? e.message : 'Check the internet connection, then try again.',
+      boot,
+    );
   }
 }
 
@@ -142,7 +147,7 @@ function startFamily(host: HTMLElement) {
       showFamilyCode(true);
     } catch (e2) {
       console.error(e2);
-      err.textContent = 'Couldn’t create the family. Check the internet connection and try again.';
+      err.textContent = e2 instanceof SetupError ? e2.message : 'Couldn’t create the family. Check the internet connection and try again.';
       err.hidden = false;
       btn.disabled = false;
       btn.textContent = 'Create';
@@ -196,7 +201,7 @@ function joinFamily(host: HTMLElement) {
     } catch (e2) {
       console.error(e2);
       btn.disabled = false;
-      fail('Couldn’t check that code. Check the internet connection and try again.');
+      fail(e2 instanceof SetupError ? e2.message : 'Couldn’t check that code. Check the internet connection and try again.');
     }
   };
   host.appendChild(ov);

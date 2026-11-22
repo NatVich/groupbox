@@ -26,6 +26,9 @@ export interface ProfileStore {
   deletePlayer(code: string, id: string): Promise<void>;
 }
 
+/** A problem with the Firebase project setup, with a message a parent can act on. */
+export class SetupError extends Error {}
+
 export const MAX_NAME = 20;
 
 export function newPlayer(name: string, avatar: number): Player {
