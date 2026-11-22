@@ -18,6 +18,11 @@ for a **+1000** bonus.
   - 🌿 **Calm:** no rush, unlimited undo and hints, no losing
   - 🏆 **Challenge:** 24 levels on a map, with 1–3 stars to earn on each
 
+- **Player profiles:** each family member picks a name and a fruit-friend avatar and keeps
+  their own stars and best scores. A **family leaderboard** compares everyone.
+  Profiles are saved in **Firebase** and shared across devices with a family code
+  (like `PEAR-4821`). See [`docs/firebase-setup.md`](docs/firebase-setup.md).
+
 Big buttons, one tap to pop (with an optional "tap twice" safety), gentle sounds with a mute
 button, and progress saved in the browser. It can be installed as an app (PWA) and works
 offline.

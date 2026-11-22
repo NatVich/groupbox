@@ -19,12 +19,15 @@ import type { GameState, MoveEvents, Pos, Tile } from '../game/types';
 import { ICONS, tileSvg } from './art';
 import { confetti } from './fx';
 import { sfx } from './sound';
-import type { SaveData } from './store';
+import type { Player } from '../data/types';
+import type { DeviceSettings } from './store';
 
 export type Mode = { kind: 'calm' } | { kind: 'challenge'; level: number };
 
 export interface GameCallbacks {
-  data: SaveData;
+  player: Player;
+  settings: DeviceSettings;
+  /** Save the player's progress. */
   persist: () => void;
   onExit: () => void;
   onNextLevel: (n: number) => void;
@@ -254,7 +257,7 @@ export class GameView {
         } else if (!got) m.classList.remove('got');
       });
     } else {
-      this.q('.best-val').textContent = String(Math.max(this.cb.data.calmBest, 0));
+      this.q('.best-val').textContent = String(Math.max(this.cb.player.calmBest, 0));
     }
     this.updatePreview();
   }
@@ -265,7 +268,7 @@ export class GameView {
       el.innerHTML = 'Tap a fruit to repaint it 🎨';
     } else if (this.selectionKind === 'group') {
       const n = this.selection.length;
-      el.innerHTML = `<b>${n}</b> fruit → <b>+${groupPoints(n)}</b> ${this.cb.data.twoTap ? '· tap again!' : ''}`;
+      el.innerHTML = `<b>${n}</b> fruit → <b>+${groupPoints(n)}</b> ${this.cb.settings.twoTap ? '· tap again!' : ''}`;
     } else if (this.selectionKind === 'bomb') {
       el.innerHTML = 'Tap the bomb again to go BOOM! 💥';
     } else {
@@ -305,7 +308,7 @@ export class GameView {
 
     const selected = this.selection.some((q) => q.x === p.x && q.y === p.y);
     if (t.kind === 'bomb') {
-      if ((this.selectionKind === 'bomb' && selected) || !this.cb.data.twoTap) {
+      if ((this.selectionKind === 'bomb' && selected) || !this.cb.settings.twoTap) {
         this.commit(() => detonate(this.state, p), p);
       } else {
         this.select(this.blastArea(p), 'bomb');
@@ -326,7 +329,7 @@ export class GameView {
       this.clearSelection();
       return;
     }
-    if (!this.cb.data.twoTap) {
+    if (!this.cb.settings.twoTap) {
       this.commit(() => clearGroup(this.state, p), p);
     } else {
       this.select(g, 'group');
@@ -488,7 +491,7 @@ export class GameView {
     const bonus = finishRound(this.state);
     const cleared = isBoardClear(this.state.board);
     this.updateHud();
-    const d = this.cb.data;
+    const d = this.cb.player;
     const ov = this.q('.overlay');
     let html: string;
 

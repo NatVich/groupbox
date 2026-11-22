@@ -39,6 +39,16 @@ blinks while idle, wiggles when selected and pops when cleared.
   3 undos and 3 hints per level. Star targets are calibrated per level by a simple
   bot playthrough (group points only; the clear bonus is extra). Progress saved in localStorage.
 
+## Player profiles
+- A family has a code (`FRUIT-1234`). "Start a family" creates one; "Join with a code" adds
+  another device. "Who's playing?" lists the family's players.
+- Each player has a name (up to 20 characters), a fruit avatar, and their own level stars, level
+  best scores and Calm best. Sound and tap mode are device settings.
+- The family leaderboard ranks players by total stars, then Calm best.
+- Storage: Cloud Firestore (`families/{code}/players/{id}`) with anonymous auth and
+  `firestore.rules`. With no Firebase config, or in the artifact build (`VITE_STORAGE=local`),
+  profiles are saved in the browser only.
+
 ## Look & feel
 Bright, rounded cartoon style; big buttons, chunky type; bouncing landings, confetti on
 board clear, floating score popups; gentle synthesized sounds (WebAudio) with mute toggle.
