@@ -98,7 +98,10 @@ export class PixelFxLayer {
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     const f = this.frame;
-    if (!f || !this.image || !this.ctx) return;
+    if (!f || !this.image || !this.ctx) {
+      this.raf = 0; // nothing to draw on; let the next play() start a fresh loop
+      return;
+    }
     clearFrame(f);
     for (const fx of this.live) {
       fx.update(dt);

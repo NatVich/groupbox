@@ -1,5 +1,6 @@
 import { makeRng } from '../game/rng';
 import {
+  allGroups,
   at,
   bestHint,
   clearGroup,
@@ -60,6 +61,8 @@ export class GameView {
   private painting = false;
   private busy = false;
   private ended = false;
+  /** Goes up on every new board; delayed steps from an earlier board check it and do nothing. */
+  private round = 0;
   private size = 48;
   private tiles = new Map<number, HTMLElement>();
   private boardEl!: HTMLElement;
@@ -135,6 +138,7 @@ export class GameView {
   // ---------- lifecycle ----------
 
   private start() {
+    this.round++;
     if (this.mode.kind === 'calm') {
       this.state = newGame(CALM, makeRng(Date.now() & 0xffffffff));
       this.level = null;
@@ -305,7 +309,7 @@ export class GameView {
   }
 
   private onTap(e: PointerEvent) {
-    if (this.busy || this.ended) return;
+    if (e.button !== 0 || this.busy || this.ended) return;
     const p = this.cellFromEvent(e);
     if (!p) return;
     const t = at(this.state.board, p.x, p.y);
@@ -440,13 +444,28 @@ export class GameView {
     if (ev.points > 0 || ev.cleared.length) this.floatScore(ev, tapped);
 
     // 2. After the pop, let everything fall into place.
+    const round = this.round;
     setTimeout(() => {
+      if (round !== this.round) return; // a new board was started meanwhile
       this.render();
       this.updateHud();
       this.busy = false;
-      if (!hasMoves(this.state)) setTimeout(() => this.endRound(), 600);
+      if (!hasMoves(this.state)) {
+        // Check again when the time comes: Undo or a new board in between means play goes on.
+        setTimeout(() => {
+          if (round === this.round && !this.ended && !hasMoves(this.state)) this.endRound();
+        }, 600);
+      } else if (!allGroups(this.state.board).length) {
+        this.toast(this.onlyPowerUpsLeft());
+      }
     }, ev.cleared.length ? 140 : 0);
     this.updateHud();
+  }
+
+  /** What to do when no group is left but a bomb or the paint brush can keep the round going. */
+  private onlyPowerUpsLeft(): string {
+    const bomb = this.state.board.cells.some((col) => col.some((t) => t?.kind === 'bomb'));
+    return bomb ? '💣 No groups left. Tap a bomb!' : '🖌️ No groups left. Tap Brush, then a fruit to repaint it!';
   }
 
   /** Pixel-art effects for a move: a fruit-coloured burst, POW for bombs, a poof for each gift. */
@@ -474,9 +493,12 @@ export class GameView {
     const { cols, rows } = this.state.board;
     const w = cols * this.size;
     const h = rows * this.size;
+    const round = this.round;
     this.fx.play('confetti', w / 2, h);
     this.fx.play('firework', w * 0.3, h * 0.35, { palette: FRUIT_RAMPS[0] });
-    setTimeout(() => this.fx.play('firework', w * 0.7, h * 0.3, { palette: FRUIT_RAMPS[3] }), 350);
+    setTimeout(() => {
+      if (round === this.round) this.fx.play('firework', w * 0.7, h * 0.3, { palette: FRUIT_RAMPS[3] });
+    }, 350);
   }
 
   private floatScore(ev: MoveEvents, tapped: Pos) {
@@ -516,7 +538,10 @@ export class GameView {
   private hint() {
     if (this.hintsLeft <= 0 || this.busy || this.ended) return;
     const h = bestHint(this.state.board);
-    if (!h.length) return;
+    if (!h.length) {
+      if (this.state.brushes > 0) this.toast(this.onlyPowerUpsLeft());
+      return;
+    }
     this.hintsLeft--;
     this.clearSelection();
     for (const p of h) {
@@ -618,7 +643,11 @@ export class GameView {
     ov.innerHTML = html;
     const party = cleared || /class="on"/.test(html) || /New best/.test(html);
     if (party) this.celebrate();
-    setTimeout(() => ov.classList.remove('hidden'), party ? 1300 : 0);
+    // The card waits for the fireworks; skip it if a new board was started in the meantime.
+    const round = this.round;
+    setTimeout(() => {
+      if (round === this.round) ov.classList.remove('hidden');
+    }, party ? 1300 : 0);
     const on = (sel: string, fn: () => void) => {
       const b = ov.querySelector<HTMLElement>(sel);
       if (b) b.onclick = fn;

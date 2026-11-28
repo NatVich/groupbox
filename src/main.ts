@@ -1,8 +1,9 @@
 import './ui/style.css';
-import { openStore } from './data';
+import { LoadError, openStore } from './data';
 import {
   cleanName,
   dailyBoard,
+  diffProgress,
   Family,
   leaderboard,
   levelsBeaten,
@@ -40,12 +41,55 @@ let family: Family | null = null;
 let players: Player[] = [];
 let player: Player | null = null;
 let current: GameView | null = null;
+/** Draws the screen that is showing again; used when other devices changed the family's data. */
+let rerender: (() => void) | null = null;
+let lastRefresh = 0;
 
 function show(el: HTMLElement) {
   current?.destroy();
   current = null;
   app.replaceChildren(el);
 }
+
+const playersSignature = () =>
+  JSON.stringify(
+    [...players]
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((p) => [p.id, p.name, p.avatar, p.levelStars, p.levelBest, p.calmBest, p.daily ?? null]),
+  ) + (player?.id ?? '');
+
+/** Reloads the family's players (at most every 2 s). True when anything shown on screen changed. */
+async function refreshPlayers(): Promise<boolean> {
+  if (!family || Date.now() - lastRefresh < 2000) return false;
+  lastRefresh = Date.now();
+  const before = playersSignature();
+  try {
+    await loadPlayers();
+  } catch {
+    return false;
+  }
+  // The current player may have new progress from another device, or may have been deleted there.
+  if (player) player = players.find((p) => p.id === player!.id) ?? null;
+  return playersSignature() !== before;
+}
+
+/** Shows `render`'s screen, then quietly checks for changes made on other devices and redraws. */
+function keepFresh(render: () => void, el: HTMLElement) {
+  rerender = render;
+  void refreshPlayers().then((changed) => {
+    if (changed && app.contains(el) && !app.querySelector('.overlay')) render();
+  });
+}
+
+// Coming back to the app after a while: pick up what other devices saved meanwhile.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || current || !rerender) return;
+  const render = rerender;
+  lastRefresh = 0;
+  void refreshPlayers().then((changed) => {
+    if (changed && rerender === render && !current && !app.querySelector('.overlay')) render();
+  });
+});
 
 function h(html: string): HTMLElement {
   const t = document.createElement('template');
@@ -77,6 +121,7 @@ function message(title: string, body: string, retry?: () => void) {
       </div>
     </div>`);
   if (retry) el.querySelector<HTMLElement>('.retry')!.onclick = retry;
+  rerender = null;
   show(el);
 }
 
@@ -84,9 +129,9 @@ function message(title: string, body: string, retry?: () => void) {
 
 async function boot() {
   show(h(`<div class="screen centered"><div class="loading">${fruitSvg(0)}<p>Loading…</p></div></div>`));
-  store = await openStore();
-  store.onSaveError = (e) => warn(`Progress is not saving to the family yet. ${e.message}`);
   try {
+    store = await openStore();
+    store.onSaveError = (e) => warn(`Progress is not saving to the family yet. ${e.message}`);
     if (settings.familyCode) family = await store.getFamily(settings.familyCode);
     if (!family && store.kind === 'local') {
       // Browser-only mode: one family per browser, created quietly.
@@ -101,6 +146,11 @@ async function boot() {
     else whoIsPlaying();
   } catch (e) {
     console.error(e);
+    if (e instanceof LoadError) {
+      // A failed download is remembered by the browser for this page, so start the page again.
+      message('Can’t load GroupBox', 'Check the internet connection, then try again.', () => location.reload());
+      return;
+    }
     message(
       e instanceof SetupError ? 'One more setup step' : 'Can’t reach GroupBox',
       e instanceof SetupError ? e.message : 'Check the internet connection, then try again.',
@@ -130,6 +180,7 @@ function welcome() {
     </div>`);
   el.querySelector<HTMLElement>('.start')!.onclick = () => startFamily(el);
   el.querySelector<HTMLElement>('.join')!.onclick = () => joinFamily(el);
+  rerender = null;
   show(el);
 }
 
@@ -234,7 +285,7 @@ function showFamilyCode(isNew = false) {
       <div class="card">
         <h2>${isNew ? 'Your family is ready!' : esc(family.name)}</h2>
         <p class="sub">To play on another phone or tablet, choose <b>Join with a code</b> and type:</p>
-        <div class="family-code">${family.code}</div>
+        <div class="family-code">${esc(family.code)}</div>
         <button class="btn copy">Copy code</button>
         <p class="hint">Anyone with this code can see and play your family’s profiles, so share it only with family.</p>
         <div class="actions"><button class="btn primary close">${isNew ? 'Add players' : 'Done'}</button></div>
@@ -275,7 +326,7 @@ function whoIsPlaying() {
           .sort((a, b) => a.name.localeCompare(b.name))
           .map(
             (p) => `
-          <div class="player-card" data-id="${p.id}">
+          <div class="player-card" data-id="${esc(p.id)}">
             <button class="pick" aria-label="Play as ${esc(p.name)}">${avatar(p, 'big')}<b>${esc(p.name)}</b>
               <span class="mini-total">${ICONS.star}${totalStars(p)}</span></button>
             <button class="edit" aria-label="Edit ${esc(p.name)}">✏️</button>
@@ -300,6 +351,7 @@ function whoIsPlaying() {
   el.querySelector<HTMLElement>('.leave')?.addEventListener('click', () => leaveFamily(el));
   show(el);
   if (!players.length) editPlayer(null);
+  keepFresh(whoIsPlaying, el);
 }
 
 function choosePlayer(p: Player) {
@@ -382,7 +434,8 @@ function editPlayer(existing: Player | null) {
       if (legacy) Object.assign(p, legacy);
     }
     try {
-      await store.savePlayer(family!.code, p);
+      if (existing) await store.saveProfile(family!.code, p.id, { name: p.name, avatar: p.avatar });
+      else await store.savePlayer(family!.code, p);
       if (!existing && players.length === 0) clearLegacy();
       players = [...players.filter((x) => x.id !== p.id), p];
       if (player?.id === p.id) player = p;
@@ -403,7 +456,7 @@ function leaveFamily(host: HTMLElement) {
     <div class="overlay">
       <div class="card">
         <h2>Switch family?</h2>
-        <p class="sub">This device will stop showing <b>${esc(family?.name ?? '')}</b>. Nothing is deleted: join again any time with the code <b>${family?.code}</b>.</p>
+        <p class="sub">This device will stop showing <b>${esc(family?.name ?? '')}</b>. Nothing is deleted: join again any time with the code <b>${esc(family?.code ?? '')}</b>.</p>
         <div class="actions">
           <button class="btn primary yes">Switch family</button>
           <button class="btn ghost no">Cancel</button>
@@ -457,6 +510,7 @@ async function leaderboardScreen() {
       </ol>
     </div>`);
   el.querySelector<HTMLElement>('.back')!.onclick = () => (player ? menu() : whoIsPlaying());
+  rerender = () => void leaderboardScreen();
   show(el);
 }
 
@@ -467,7 +521,14 @@ function menu() {
   const p = player;
   const el = h(`
     <div class="screen menu">
-      <button class="player-chip" aria-label="Switch player">${avatar(p)}<span>Hi, <b>${esc(p.name)}</b>!</span><small>Switch</small></button>
+      <div class="menu-top">
+        <button class="player-chip" aria-label="Switch player">${avatar(p)}<span>Hi, <b>${esc(p.name)}</b>!</span><small>Switch</small></button>
+        ${
+          (settings.skin ?? 'fruit') === 'retro'
+            ? '<button class="skin-quick" data-skin="fruit" aria-label="Switch to the fruit look"><span class="ico">🍓</span><span>Fruit</span></button>'
+            : '<button class="skin-quick" data-skin="retro" aria-label="Switch to the retro look"><span class="ico">👾</span><span>Retro</span></button>'
+        }
+      </div>
       <div class="logo">
         <div class="fruit-row">${[0, 1, 2, 3, 4, 5].map((i) => `<span style="animation-delay:${i * 120}ms">${fruitSvg(i)}</span>`).join('')}</div>
         <h1><span>Group</span><span>Box</span></h1>
@@ -506,7 +567,7 @@ function menu() {
     sound.firstElementChild!.outerHTML = settings.muted ? ICONS.mute : ICONS.sound;
     sfx.select();
   };
-  el.querySelectorAll<HTMLElement>('.skin-switch button').forEach((b) => {
+  el.querySelectorAll<HTMLElement>('.skin-switch button, .skin-quick').forEach((b) => {
     b.onclick = () => {
       const s = b.dataset.skin as Skin;
       if (s === (settings.skin ?? 'fruit')) return;
@@ -525,6 +586,7 @@ function menu() {
     sfx.select();
   };
   show(el);
+  keepFresh(menu, el);
   let seen = false;
   try {
     seen = !!localStorage.getItem('groupbox-seen-howto');
@@ -590,6 +652,7 @@ async function dailyScreen() {
     </div>`);
   el.querySelector<HTMLElement>('.back')!.onclick = () => menu();
   el.querySelector<HTMLElement>('.play')!.onclick = () => play({ kind: 'daily', date: today });
+  rerender = () => void dailyScreen();
   show(el);
 }
 
@@ -645,6 +708,7 @@ function levelMap() {
     b.onclick = () => play({ kind: 'challenge', level: Number(b.dataset.n) });
   });
   show(el);
+  keepFresh(levelMap, el);
   const next = [...el.querySelectorAll<HTMLElement>('.level:not(.locked):not(.done)')][0];
   next?.classList.add('next-up');
   next?.scrollIntoView({ block: 'center' });
@@ -657,16 +721,25 @@ function play(mode: Mode) {
   const p = player;
   const code = family.code;
   if (mode.kind === 'challenge') getLevel(mode.level); // warm the cache
+  // What has been saved so far; each save sends only what the game added since.
+  let saved: Player = JSON.parse(JSON.stringify(p));
   const view = new GameView(mode, {
     player: p,
     settings,
     persist: () => {
+      const patch = diffProgress(saved, p);
+      if (!patch) return;
+      saved = JSON.parse(JSON.stringify(p));
       p.updatedAt = Date.now();
-      store.savePlayer(code, p).catch((e) => console.warn('Could not save progress', e));
+      store.saveProgress(code, p.id, patch).catch((e) => {
+        console.warn('Could not save progress', e);
+        warn('This game could not be saved. Try again in a moment.');
+      });
     },
     onExit: () => (mode.kind === 'calm' ? menu() : mode.kind === 'daily' ? void dailyScreen() : levelMap()),
     onNextLevel: (n) => play({ kind: 'challenge', level: n }),
   });
+  rerender = null;
   show(view.el);
   current = view;
 }

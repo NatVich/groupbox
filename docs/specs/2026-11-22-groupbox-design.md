@@ -64,6 +64,14 @@ board clear, floating score popups; gentle synthesized sounds (WebAudio) with mu
 - pixelfx effects on a canvas over the board: collect burst (fruit-coloured) on pops, firework for 10+,
   POW for bombs, poof for gifts, confetti and fireworks before a win card. Skipped with reduced motion.
 
+## Saving and updates
+- Progress is saved as a patch of what a game added, merged into the player's record; a value
+  never goes down, so a device that has been open for days can't wipe stars earned elsewhere.
+  Name/avatar edits are saved separately. Player records read back are sanitized.
+- Screens refresh the family's players in the background and when the app comes back to the front.
+- Service worker: pages network-first (new versions show at once; saved copy offline), built files
+  cached per build (stamped by the Vite build), fonts cached, Firebase traffic left alone.
+
 ## Architecture
 - `src/game/` — pure logic, no DOM: `rng`, `board`, `rules` (groups, gravity, scoring,
   gifts, power-ups), `levels`. Fully unit tested with Vitest.
